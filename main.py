@@ -119,7 +119,7 @@ def fifthTask():
             exit(1)
         if userInput == 1:
             # * Atrinkti prekes, kurios turi susietų komponentų
-            stmt = session.query(Item).join(Components, Item.id == Components.item_id).options(joinedload(Item.components)).distinct()
+            stmt = session.query(Item).join(Components, Item.id == Components.item_id).distinct()
             for item in stmt:
                 print(item)
 

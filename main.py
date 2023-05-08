@@ -1,5 +1,3 @@
-import sqlite3
-
 from sqlalchemy import *
 from sqlalchemy.orm import *
 from datetime import datetime
@@ -29,7 +27,7 @@ class Item(Base):
     unit_price = Column(Numeric(10, 2), nullable=False, default=1.00)
     created_at = Column(DateTime, default=datetime.now())
     shop_id = Column(Integer, ForeignKey('shops.id'))
-    shop = relationship("Shop")
+    shop = relationship("Shop", back_populates="items")
     components = relationship("Components", back_populates="item")
 
     def __repr__(self):
@@ -65,9 +63,6 @@ def createEntries():
         component_vanduo_maxima = Components(name="Vanduo", quantity=1.10, item=item_duona_maxima)
         component_pienas_maxima = Components(name="Pienas", quantity=1.10, item=item_pienas_maxima)
 
-        Session = sessionmaker(bind=engine)
-        session = Session()
-
         session.add_all([shop_iki, shop_maxima, item_duona_iki, item_pienas_iki, item_duona_maxima, item_pienas_maxima, component_pienas_maxima, component_vanduo_maxima, component_miltai_maxima, component_pienas_iki, component_vanduo_iki, component_miltai_iki])
         session.commit()
     except:
@@ -78,38 +73,23 @@ def thirdTask():
 
     # * Pakeisti 'IKI' parduotuvės, 'Žemaičių duonos' komponento 'Vandens' kiekį (quantity) iš 1.00 į 1.45.
 
-    iki = session.query(Shop.id).filter(Shop.name == "IKI").one() # finding ID of IKI shop
-    iki_items = session.query(Item.id).filter(Item.shop_id == iki.id).all() #finding IKI shop's item's IDs
-
-    id_list_clean = []
-    for item in iki_items:
-        id_list_clean.append(item.id) #cleaning output
-
-    #finding IKI Vanduo quantity
-    iki_water = session.query(Components).filter(Components.name == "Vanduo").filter(Components.item_id.in_(id_list_clean)).one()
-
-    print(iki_water.name, iki_water.quantity)
-    iki_water.quantity = 1.45
+    iki_shop = session.query(Shop).filter_by(name='IKI').first()
+    ziem_duona = session.query(Item).filter_by(name='Žemaičių duona', shop=iki_shop).first()
+    vanduo_component = session.query(Components).filter_by(name='Vanduo', item=ziem_duona).first()
+    print(vanduo_component.name, vanduo_component.quantity)
+    vanduo_component.quantity = 1.45
     session.commit()
-    iki_water = session.query(Components).filter(Components.name == "Vanduo").filter(Components.item_id.in_(id_list_clean)).one()
-    print(iki_water.name, iki_water.quantity)
+    print(vanduo_component.name, vanduo_component.quantity)
 
     # * Ištrinti 'MAXIMA' parduotuvės, 'Aukštaičių pieno' komponentą 'Pienas'.
 
-    maxima = session.query(Shop.id).filter(Shop.name == "MAXIMA").one()  # finding ID of IKI shop
-    maxima_items = session.query(Item.id).filter(Item.shop_id == maxima.id).all()  # finding IKI shop's item's IDs
-
-    id_list_clean = []
-    for item in maxima_items:
-        id_list_clean.append(item.id)  # cleaning output
-
-    # finding IKI Vanduo quantity
-    maxima_milk = session.query(Components).filter(Components.name == "Pienas").filter(Components.item_id.in_(id_list_clean)).one()
-
-    print(maxima_milk.name, maxima_milk.quantity)
-    session.delete(maxima_milk)
+    maxima_shop = session.query(Shop).filter_by(name='MAXIMA').first()
+    aukst_pienas = session.query(Item).filter_by(name='Aukštaičių pienas', shop=maxima_shop).first()
+    pienas_component = session.query(Components).filter_by(name='Pienas', item=aukst_pienas).first()
+    session.delete(pienas_component)
+    session.commit()
     try:
-        maxima_milk = session.query(Components).filter(Components.name == "Pienas").filter(Components.item_id.in_(id_list_clean)).one()
+        aukst_pienas = session.query(Item).filter_by(name='Aukštaičių pienas', shop=maxima_shop).first()
     except:
         print("Not found")
 
@@ -120,21 +100,26 @@ def fourthTask():
         print(shop)
         items = session.query(Item).filter(Item.shop_id == shop.id).all()
         for item in items:
-            print(item)
+            print(f'  * {item}')
             components = session.query(Components).filter(Components.item_id == item.id).all()
             for component in components:
-                print(component)
-            print('\n')
+                print(f"      - {component}")
+        print('\n')
 
 def fifthTask():
 
     while True:
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~FIFTH TASK~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         print(f'[1] Atrinkti prekes, kurios turi susietų komponentų\n[2] Atrinkti prekes, kurių pavadinime yra tekstas "ien"\n[3] Suskaičiuoti iš kiek komponentų sudaryta kiekviena prekė\n[4] Suskaičiuoti kiekvienos prekės komponentų kiekį (quantity)\n[5] Išvesti komponentus kurių kiekis (quantity) didesnis nei nurodytas\n\n[0] Exit')
-        userInput = int(input('Enter your choice: '))
+        
+        try:
+            userInput = int(input('Enter your choice: '))
+        except:
+            print("Error occured!")
+            exit(1)
         if userInput == 1:
             # * Atrinkti prekes, kurios turi susietų komponentų
-            stmt = items_with_components = session.query(Item).join(Components, Item.id == Components.item_id).options(joinedload(Item.components)).distinct()
+            stmt = session.query(Item).join(Components, Item.id == Components.item_id).options(joinedload(Item.components)).distinct()
             for item in stmt:
                 print(item)
 
@@ -146,7 +131,7 @@ def fifthTask():
             pass
         elif userInput == 3:
             # * Suskaičiuoti iš kiek komponentų sudaryta kiekviena prekė
-            components_count = session.query(Item.id, func.count(Components.quantity).label('components_count')).filter(Item.id == Components.item_id).group_by(Item.id).all()
+            components_count = session.query(Item.id, func.count(Components.quantity)).filter(Item.id == Components.item_id).group_by(Item.id).all()
             for component in components_count:
                 stmt = session.query(Item).filter(Item.id == component[0]).one()
                 print(stmt.name, component[1])
@@ -175,7 +160,11 @@ if __name__ == '__main__':
     session = Session()
     while True:
         print(f'[1] Create table (1 Task)\n[2] Create entries (2 Task)\n[3] Change components quantities (3 Task)\n[4] Print all shops, items and componenets\n[5] Queries\n[6] Drop tables\n\n[0] Exit')
-        userInput = int(input('Enter your choice: '))
+        try:
+            userInput = int(input('Enter your choice: '))
+        except:
+            print("Error occured! Wrong input, exiting task.")
+            exit(1)
         if userInput == 1:
             Base.metadata.create_all(engine)
         elif userInput == 2:

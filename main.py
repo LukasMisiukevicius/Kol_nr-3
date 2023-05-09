@@ -87,7 +87,6 @@ def thirdTask():
     aukst_pienas = session.query(Item).filter_by(name='Aukštaičių pienas', shop=maxima_shop).first()
     pienas_component = session.query(Components).filter_by(name='Pienas', item=aukst_pienas).first()
     try:
-        aukst_pienas = session.query(Item).filter_by(name='Aukštaičių pienas', shop=maxima_shop).first()
         session.delete(pienas_component)
         session.commit()
     except:
